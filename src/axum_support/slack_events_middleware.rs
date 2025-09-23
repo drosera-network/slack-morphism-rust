@@ -149,20 +149,23 @@ where
 }
 
 #[derive(Clone)]
-pub struct SlackEventsApiMiddleware<SCHC, S, SE>
+pub struct SlackEventsApiMiddleware<SCHC, S, SE, AS>
 where
     SCHC: SlackClientHttpConnector + Send + Sync + Clone,
     SE: SlackEventsExtractor + Clone,
+    AS: Send + Sync + 'static + Clone,
 {
     slack_signing_secret: SlackSigningSecret,
     environment: Arc<SlackClientEventsListenerEnvironment<SCHC>>,
     extractor: SE,
     _ph_s: PhantomData<S>,
+    _ph_as: PhantomData<AS>,
 }
 
-impl<SCHC, S> SlackEventsApiMiddleware<SCHC, S, SlackEventsEmptyExtractor>
+impl<SCHC, S, AS> SlackEventsApiMiddleware<SCHC, S, SlackEventsEmptyExtractor, AS>
 where
     SCHC: SlackClientHttpConnector + Send + Sync + Clone,
+    AS: Send + Sync + 'static + Clone,
 {
     pub fn new(
         environment: Arc<SlackClientEventsListenerEnvironment<SCHC>>,
@@ -173,10 +176,14 @@ where
             environment,
             extractor: SlackEventsEmptyExtractor::new(),
             _ph_s: PhantomData,
+            _ph_as: PhantomData,
         }
     }
 
-    pub fn with_event_extractor<SE>(self, extractor: SE) -> SlackEventsApiMiddleware<SCHC, S, SE>
+    pub fn with_event_extractor<SE>(
+        self,
+        extractor: SE,
+    ) -> SlackEventsApiMiddleware<SCHC, S, SE, AS>
     where
         SE: SlackEventsExtractor + Clone,
     {
@@ -185,11 +192,12 @@ where
             environment: self.environment,
             extractor,
             _ph_s: PhantomData,
+            _ph_as: PhantomData,
         }
     }
 }
 
-impl<S, SCHC, I, SE> Layer<S> for SlackEventsApiMiddleware<SCHC, S, SE>
+impl<S, SCHC, I, SE, AS> Layer<S> for SlackEventsApiMiddleware<SCHC, S, SE, AS>
 where
     S: Service<Request<Body>, Response = I> + Send + 'static + Clone,
     S::Future: Send + 'static,
@@ -197,6 +205,7 @@ where
     I: IntoResponse,
     SCHC: SlackClientHttpConnector + Send + Sync + 'static + Clone,
     SE: SlackEventsExtractor + Clone,
+    AS: Send + Sync + 'static + Clone,
 {
     type Service = SlackEventsApiMiddlewareService<S, SCHC, SE>;
 
@@ -210,11 +219,13 @@ where
     }
 }
 
-impl<H: 'static + Send + Sync + Connect + Clone> SlackEventsAxumListener<H> {
+impl<H: 'static + Send + Sync + Connect + Clone, AS: Send + Sync + 'static + Clone>
+    SlackEventsAxumListener<H, AS>
+{
     pub fn events_layer<S, I>(
         &self,
         slack_signing_secret: &SlackSigningSecret,
-    ) -> SlackEventsApiMiddleware<SlackClientHyperConnector<H>, S, SlackEventsEmptyExtractor>
+    ) -> SlackEventsApiMiddleware<SlackClientHyperConnector<H>, S, SlackEventsEmptyExtractor, AS>
     where
         S: Service<Request<Body>, Response = I> + Send + 'static + Clone,
         S::Future: Send + 'static,

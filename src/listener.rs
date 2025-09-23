@@ -174,3 +174,6 @@ impl SlackOAuthListenerConfig {
 
 pub type UserCallbackFunction<E, IF, SCHC> =
     fn(E, Arc<SlackClient<SCHC>>, SlackClientEventsUserState) -> IF;
+
+pub type UserCallbackFunctionWithState<AS, E, IF, SCHC> =
+    fn(AS, E, Arc<SlackClient<SCHC>>, SlackClientEventsUserState) -> IF;

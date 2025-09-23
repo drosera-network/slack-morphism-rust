@@ -16,9 +16,12 @@ use tracing::*;
 use crate::api::*;
 use crate::errors::*;
 use crate::hyper_tokio::SlackClientHyperConnector;
+use crate::listener::UserCallbackFunctionWithState;
 use crate::{AnyStdResult, SlackClientHttpApiUri};
 
-impl<H: 'static + Send + Sync + Connect + Clone> SlackEventsAxumListener<H> {
+impl<H: 'static + Send + Sync + Connect + Clone, S: Send + Sync + 'static + Clone>
+    SlackEventsAxumListener<H, S>
+{
     pub fn slack_oauth_install(
         &self,
         config: &SlackOAuthListenerConfig,
@@ -52,7 +55,8 @@ impl<H: 'static + Send + Sync + Connect + Clone> SlackEventsAxumListener<H> {
     pub fn slack_oauth_callback(
         &self,
         config: &SlackOAuthListenerConfig,
-        install_service_fn: UserCallbackFunction<
+        install_service_fn: UserCallbackFunctionWithState<
+            S,
             SlackOAuthV2AccessTokenResponse,
             impl Future<Output = ()> + 'static + Send,
             SlackClientHyperConnector<H>,
@@ -60,11 +64,13 @@ impl<H: 'static + Send + Sync + Connect + Clone> SlackEventsAxumListener<H> {
     ) -> impl Fn(Request<Body>) -> BoxFuture<'static, Response<Body>> + 'static + Send + Clone {
         let environment = self.environment.clone();
         let config = config.clone();
+        let state = self.state.clone();
         move |req| {
             let config = config.clone();
             let environment = environment.clone();
             let err_environment = environment.clone();
             let err_config = config.clone();
+            let app_state = state.clone();
 
             async move {
                 let params = HyperExtensions::parse_query_params(req.uri());
@@ -100,6 +106,7 @@ impl<H: 'static + Send + Sync + Connect + Clone> SlackEventsAxumListener<H> {
                                     &oauth_resp.authed_user.id
                                 );
                                 install_service_fn(
+                                    app_state,
                                     oauth_resp,
                                     environment.client.clone(),
                                     environment.user_state.clone(),
@@ -175,12 +182,12 @@ impl<H: 'static + Send + Sync + Connect + Clone> SlackEventsAxumListener<H> {
         }
     }
 
-    pub fn oauth_router<S: Send + Sync + 'static>(
+    pub fn oauth_router(
         &self,
         root_path: &str,
         config: &SlackOAuthListenerConfig,
-        app_state: S,
-        install_service_fn: UserCallbackFunction<
+        install_service_fn: UserCallbackFunctionWithState<
+            S,
             SlackOAuthV2AccessTokenResponse,
             impl Future<Output = ()> + 'static + Send,
             SlackClientHyperConnector<H>,
@@ -198,7 +205,7 @@ impl<H: 'static + Send + Sync + Connect + Clone> SlackEventsAxumListener<H> {
                     .as_str(),
                 axum::routing::get(self.slack_oauth_callback(config, install_service_fn)),
             )
-            .with_state(app_state)
+            .with_state(self.state.clone())
     }
 
     fn handle_error(

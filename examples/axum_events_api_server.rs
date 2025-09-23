@@ -11,7 +11,11 @@ use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
+#[derive(Clone)]
+struct AppState {}
+
 async fn test_oauth_install_function(
+    _state: AppState,
     resp: SlackOAuthV2AccessTokenResponse,
     _client: Arc<SlackHyperClient>,
     _states: SlackClientEventsUserState,
@@ -93,8 +97,8 @@ async fn test_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     );
     let signing_secret: SlackSigningSecret = config_env_var("SLACK_SIGNING_SECRET")?.into();
 
-    let listener: SlackEventsAxumListener<SlackHyperHttpsConnector> =
-        SlackEventsAxumListener::new(listener_environment.clone());
+    let listener: SlackEventsAxumListener<SlackHyperHttpsConnector, AppState> =
+        SlackEventsAxumListener::new(listener_environment.clone(), AppState {});
 
     // build our application route with OAuth nested router and Push/Command/Interaction events
     let app = axum::routing::Router::new()

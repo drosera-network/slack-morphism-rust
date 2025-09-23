@@ -6,15 +6,22 @@ use std::sync::Arc;
 mod slack_events_middleware;
 pub use slack_events_middleware::SlackEventsApiMiddleware;
 
-pub struct SlackEventsAxumListener<H: 'static + Send + Sync + Connect + Clone> {
+pub struct SlackEventsAxumListener<
+    H: 'static + Send + Sync + Connect + Clone,
+    S: Send + Sync + 'static + Clone,
+> {
     pub environment: Arc<SlackClientEventsListenerEnvironment<SlackClientHyperConnector<H>>>,
+    pub state: S,
 }
 
-impl<H: 'static + Send + Sync + Connect + Clone> SlackEventsAxumListener<H> {
+impl<H: 'static + Send + Sync + Connect + Clone, S: Send + Sync + 'static + Clone>
+    SlackEventsAxumListener<H, S>
+{
     pub fn new(
         environment: Arc<SlackClientEventsListenerEnvironment<SlackClientHyperConnector<H>>>,
+        state: S,
     ) -> Self {
-        Self { environment }
+        Self { environment, state }
     }
 }
 
