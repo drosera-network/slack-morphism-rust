@@ -192,7 +192,7 @@ impl<H: 'static + Send + Sync + Connect + Clone, S: Send + Sync + 'static + Clon
             impl Future<Output = ()> + 'static + Send,
             SlackClientHyperConnector<H>,
         >,
-    ) -> axum::routing::Router {
+    ) -> axum::routing::Router<S> {
         axum::routing::Router::new()
             .route(
                 config.install_path.replace(root_path, "").as_str(),
