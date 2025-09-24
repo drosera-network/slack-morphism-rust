@@ -28,21 +28,23 @@ impl<H: 'static + Send + Sync + Connect + Clone, S: Send + Sync + 'static + Clon
     ) -> impl Fn(Request<Body>) -> BoxFuture<'static, Response> + 'static + Send + Clone {
         let environment = self.environment.clone();
         let config = config.clone();
-        move |_| {
+        move |req| {
             let config = config.clone();
             let environment = environment.clone();
+            let query_params = HyperExtensions::parse_query_params(req.uri());
+            let state_params = query_params.get("state").cloned();
             async move {
+                let redirect_uri = config.to_redirect_url()?.as_str().to_string();
+                let params = vec![
+                    ("client_id", Some(config.client_id.value())),
+                    ("scope", Some(&config.bot_scope)),
+                    ("user_scope", config.user_scope.as_ref()),
+                    ("redirect_uri", Some(&redirect_uri)),
+                    ("state", state_params.as_ref()),
+                ];
                 let full_uri = SlackClientHttpApiUri::create_url_with_params(
                     SlackOAuthListenerConfig::OAUTH_AUTHORIZE_URL_VALUE.parse()?,
-                    &vec![
-                        ("client_id", Some(config.client_id.value())),
-                        ("scope", Some(&config.bot_scope)),
-                        ("user_scope", config.user_scope.as_ref()),
-                        (
-                            "redirect_uri",
-                            Some(config.to_redirect_url()?.as_str().to_string()).as_ref(),
-                        ),
-                    ],
+                    &params,
                 )?;
                 debug!("Redirecting to Slack OAuth authorize: {}", &full_uri);
                 HyperExtensions::hyper_redirect_to(full_uri.as_ref()).map(|r| r.into_response())
