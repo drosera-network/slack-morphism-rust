@@ -112,6 +112,7 @@ impl<H: 'static + Send + Sync + Connect + Clone, S: Send + Sync + 'static + Clon
                                     oauth_resp,
                                     environment.client.clone(),
                                     environment.user_state.clone(),
+                                    params.get("state").cloned(),
                                 )
                                 .await;
                                 HyperExtensions::hyper_redirect_to(&config.redirect_installed_url)
